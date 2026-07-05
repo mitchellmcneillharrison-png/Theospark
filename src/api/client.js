@@ -1,25 +1,20 @@
-// Theospark API client.
+// Theospark API client (browser side).
 //
-// The real API is not hooked up yet. When it is, set these in a `.env` file:
-//   VITE_THEOSPARK_API_URL=...   (your backend / proxy endpoint)
-//   VITE_THEOSPARK_API_KEY=...
-// and adjust the fetch body in `askTheospark` to match your provider.
-
-const API_URL = import.meta.env.VITE_THEOSPARK_API_URL || ''
-const API_KEY = import.meta.env.VITE_THEOSPARK_API_KEY || ''
+// The actual provider call and the secret key live in the Vercel serverless
+// function at `api/chat.js` — the browser only talks to `/api/chat`, so the
+// key is never exposed. Configure the key server-side (see api/chat.js).
 
 // Two study modes: Deep runs on a fast basic model, Deeper on an advanced one.
+// (These labels drive the UI toggle; the model ids live in api/chat.js.)
 export const MODES = {
   deep: {
     id: 'deep',
     label: 'Deep',
-    model: 'basic-model', // swap for your basic model id
     tagline: 'Quick, faithful answers',
   },
   deeper: {
     id: 'deeper',
     label: 'Deeper',
-    model: 'advanced-model', // swap for your advanced model id
     tagline: 'Advanced study with full nuance',
   },
 }
@@ -36,43 +31,41 @@ export const DENOMINATIONS = [
   'Pentecostal',
 ]
 
-function systemPrompt(denomination) {
-  return [
-    'You are Theospark, a Christian theology assistant.',
-    'You answer questions about denominations, Bible verses, doctrine, and historical context.',
-    `Answer from the perspective of the ${denomination} tradition, and note where other major traditions differ when it is helpful.`,
-    'Cite Scripture references and historical sources where relevant.',
-  ].join(' ')
+function placeholderReply(mode, denomination) {
+  return (
+    `(${MODES[mode]?.label ?? 'Deep'} mode · ${denomination} perspective — API not connected yet.) ` +
+    'Run `vercel dev` (or deploy) with THEOSPARK_API_URL and THEOSPARK_API_KEY set, ' +
+    'and I will answer your question here with Scripture references and historical context.'
+  )
 }
 
 export async function askTheospark({ messages, mode, denomination }) {
-  const { model } = MODES[mode] ?? MODES.deep
-
-  if (!API_URL || !API_KEY) {
-    // Placeholder response until the API is connected.
-    await new Promise((r) => setTimeout(r, 600))
-    return (
-      `(${MODES[mode]?.label ?? 'Deep'} mode · ${denomination} perspective — API not connected yet.) ` +
-      'Once an API key and endpoint are configured, I will answer your question here with Scripture references and historical context.'
-    )
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ messages, mode, denomination }),
+    })
+    // A 404 means the serverless function route doesn't exist — i.e. we're
+    // running plain `npm run dev` without the Vercel functions. On Vercel the
+    // function is always present, so fall back to a placeholder here.
+    if (res.status === 404) {
+      await new Promise((r) => setTimeout(r, 500))
+      return placeholderReply(mode, denomination)
+    }
+    if (!res.ok) {
+      const detail = await res.text().catch(() => res.statusText)
+      throw new Error(`Theospark API error: ${res.status} ${detail}`)
+    }
+    const data = await res.json()
+    return data.reply ?? data.content ?? JSON.stringify(data)
+  } catch (err) {
+    // A TypeError means the fetch itself failed (network error) — again treat
+    // it as "no function running locally" and fall back to the placeholder.
+    if (err instanceof TypeError) {
+      await new Promise((r) => setTimeout(r, 500))
+      return placeholderReply(mode, denomination)
+    }
+    throw err
   }
-
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${API_KEY}`,
-    },
-    body: JSON.stringify({
-      model,
-      system: systemPrompt(denomination),
-      messages: messages.map(({ role, content }) => ({ role, content })),
-    }),
-  })
-  if (!res.ok) {
-    throw new Error(`Theospark API error: ${res.status}`)
-  }
-  const data = await res.json()
-  // Adjust to your provider's response shape.
-  return data.reply ?? data.content ?? JSON.stringify(data)
 }
