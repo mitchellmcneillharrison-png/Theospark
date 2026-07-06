@@ -39,17 +39,20 @@ project root.
 
 ## Connecting the API
 
-The API key stays **server-side** — it is never shipped to the browser. The
-browser calls `/api/chat`, and the Vercel function makes the provider request.
+Theospark is backed by [Groq](https://groq.com) (OpenAI-compatible API). The
+key stays **server-side** — it is never shipped to the browser. The browser
+calls `/api/chat`, and the Vercel function makes the Groq request.
 
-Set these environment variables in **Vercel → Settings → Environment Variables**
+Set this environment variable in **Vercel → Settings → Environment Variables**
 (or in a local `.env.local` for `vercel dev` — see `.env.example`):
 
 ```
-THEOSPARK_API_URL=your-endpoint
-THEOSPARK_API_KEY=your-secret-key
+GROQ_API_KEY=your-groq-key
 ```
 
-The Deep / Deeper model ids and the upstream request/response shape are set in
-`api/chat.js` (`MODE_MODELS` and the `fetch` call). Deep maps to the basic
-model, Deeper to the advanced one.
+The two study modes map to Groq models in `api/chat.js` (`MODE_MODELS`):
+
+| Mode   | Model                    |
+| ------ | ------------------------ |
+| Deep   | `llama-3.1-8b-instant`   |
+| Deeper | `openai/gpt-oss-120b`    |

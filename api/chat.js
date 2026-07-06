@@ -1,16 +1,19 @@
-// Theospark serverless chat endpoint (Vercel).
+// Theospark serverless chat endpoint (Vercel) — backed by Groq.
 //
 // The API key lives here on the server — it is NEVER shipped to the browser.
-// Set these in your Vercel project (Settings -> Environment Variables), or in
-// a local .env / .env.local when running `vercel dev`:
-//   THEOSPARK_API_URL   your provider / proxy endpoint
-//   THEOSPARK_API_KEY   your secret key
-// Adjust the upstream request/response shape to match your provider.
+// Set GROQ_API_KEY in your Vercel project (Settings -> Environment Variables),
+// or in a local .env.local when running `vercel dev`.
+//
+// Groq exposes an OpenAI-compatible chat completions API.
 
-// Two study modes: Deep uses a fast basic model, Deeper an advanced one.
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
+
+// Two study modes, each mapped to a Groq model.
+//   Deep   -> Llama 3.1 8B Instant (fast, basic)
+//   Deeper -> GPT-OSS 120B (advanced)
 const MODE_MODELS = {
-  deep: 'basic-model', // swap for your basic model id
-  deeper: 'advanced-model', // swap for your advanced model id
+  deep: 'llama-3.1-8b-instant',
+  deeper: 'openai/gpt-oss-120b',
 }
 
 function systemPrompt(denomination) {
@@ -35,21 +38,27 @@ export default async function handler(req, res) {
   } = req.body || {}
   const model = MODE_MODELS[mode] || MODE_MODELS.deep
 
-  const API_URL = process.env.THEOSPARK_API_URL
-  const API_KEY = process.env.THEOSPARK_API_KEY
+  const API_KEY = process.env.GROQ_API_KEY
 
-  // Placeholder response until the provider is connected.
-  if (!API_URL || !API_KEY) {
+  // Placeholder response until the key is configured.
+  if (!API_KEY) {
     res.status(200).json({
       reply:
         `(${mode === 'deeper' ? 'Deeper' : 'Deep'} mode · ${denomination} perspective — API not connected yet.) ` +
-        'Once THEOSPARK_API_URL and THEOSPARK_API_KEY are set, I will answer your question here with Scripture references and historical context.',
+        'Set GROQ_API_KEY on the server and I will answer here with Scripture references and historical context.',
     })
     return
   }
 
+  const chatMessages = [
+    { role: 'system', content: systemPrompt(denomination) },
+    ...messages
+      .filter((m) => m.role === 'user' || m.role === 'assistant')
+      .map(({ role, content }) => ({ role, content })),
+  ]
+
   try {
-    const upstream = await fetch(API_URL, {
+    const upstream = await fetch(GROQ_URL, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -57,19 +66,25 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model,
-        system: systemPrompt(denomination),
-        messages: messages.map(({ role, content }) => ({ role, content })),
+        messages: chatMessages,
+        temperature: 0.5,
+        max_tokens: 1536,
       }),
     })
 
     if (!upstream.ok) {
-      res.status(502).json({ error: `Upstream error: ${upstream.status}` })
+      const detail = await upstream.text().catch(() => '')
+      res.status(502).json({ error: `Groq error ${upstream.status}: ${detail.slice(0, 300)}` })
       return
     }
 
     const data = await upstream.json()
-    // Adjust to your provider's response shape.
-    res.status(200).json({ reply: data.reply ?? data.content ?? JSON.stringify(data) })
+    const reply = data.choices?.[0]?.message?.content?.trim()
+    if (!reply) {
+      res.status(502).json({ error: 'Groq returned an empty response' })
+      return
+    }
+    res.status(200).json({ reply })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
