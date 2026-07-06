@@ -111,6 +111,12 @@ export const SunIcon = (p) => (
   </Icon>
 )
 
+export const BoltIcon = (p) => (
+  <Icon {...p}>
+    <path d="M13 2.5 4.8 13.2h5.4L11 21.5l8.2-10.7h-5.4Z" />
+  </Icon>
+)
+
 export const GlobeIcon = (p) => (
   <Icon {...p}>
     <circle cx="12" cy="12" r="8.5" />

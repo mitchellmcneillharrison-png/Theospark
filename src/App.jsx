@@ -1,13 +1,31 @@
 import { useEffect, useRef, useState } from 'react'
 import Sidebar from './components/Sidebar.jsx'
-import Chat from './components/Chat.jsx'
+import Thread from './components/Chat.jsx'
 import Composer from './components/Composer.jsx'
 import SettingsPanel from './components/SettingsPanel.jsx'
-import { GearIcon } from './components/Icons.jsx'
+import { FlameMark } from './components/Logo.jsx'
+import {
+  GearIcon,
+  BookIcon,
+  ChurchIcon,
+  ScrollIcon,
+  CrossIcon,
+  SunIcon,
+  GlobeIcon,
+} from './components/Icons.jsx'
 import { askTheospark, DENOMINATIONS } from './api/client.js'
 
 const STORAGE_KEY = 'theospark:conversations'
 const PREFS_KEY = 'theospark:prefs'
+
+const SUGGESTIONS = [
+  { icon: BookIcon, label: 'Explain a Bible verse', prompt: 'Can you explain the meaning of John 3:16 in its original context?' },
+  { icon: ChurchIcon, label: 'Compare denominations', prompt: 'What are the main differences between Baptist and Methodist beliefs?' },
+  { icon: ScrollIcon, label: 'Historical context', prompt: 'What was the historical context of Paul’s letter to the Romans?' },
+  { icon: CrossIcon, label: 'Doctrine & creeds', prompt: 'What does the Nicene Creed teach, and why was it written?' },
+  { icon: SunIcon, label: 'Daily devotion', prompt: 'Give me a short devotional reflection for today with a verse.' },
+  { icon: GlobeIcon, label: 'Church history', prompt: 'How did the early church spread in the first three centuries?' },
+]
 
 function loadJSON(key, fallback) {
   try {
@@ -33,6 +51,7 @@ export default function App() {
 
   const active = conversations.find((c) => c.id === activeId)
   const messages = active?.messages ?? []
+  const onThread = messages.length > 0
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations))
@@ -82,7 +101,12 @@ export default function App() {
         mode: prefs.mode,
         denomination: prefs.denomination,
       })
-      appendMessage(id, { role: 'assistant', content: reply })
+      appendMessage(id, {
+        role: 'assistant',
+        content: reply,
+        mode: prefs.mode,
+        denomination: prefs.denomination,
+      })
     } catch (err) {
       appendMessage(id, {
         role: 'assistant',
@@ -92,6 +116,18 @@ export default function App() {
       setIsThinking(false)
     }
   }
+
+  const composer = (variant) => (
+    <Composer
+      value={draft}
+      onChange={setDraft}
+      onSend={() => send(draft)}
+      mode={prefs.mode}
+      onModeChange={(mode) => setPrefs((p) => ({ ...p, mode }))}
+      disabled={isThinking}
+      variant={variant}
+    />
+  )
 
   return (
     <div className="app">
@@ -104,7 +140,7 @@ export default function App() {
         onPlaceholder={(name) => showToast(`${name} is coming soon`)}
       />
 
-      <main className="chat-pane">
+      <main className={`chat-pane ${onThread ? 'thread-mode' : 'home-mode'}`}>
         <div className="glow" />
         <div className="grain" />
 
@@ -114,28 +150,37 @@ export default function App() {
             aria-label="Settings"
             onClick={() => setSettingsOpen(true)}
           >
-            <GearIcon size={20} />
+            <GearIcon size={19} />
           </button>
         </header>
 
-        <section className="chat-body">
-          <Chat
-            messages={messages}
-            isThinking={isThinking}
-            denomination={prefs.denomination}
-            onSuggestion={(prompt) => send(prompt)}
-            endRef={endRef}
-          />
-        </section>
-
-        <Composer
-          value={draft}
-          onChange={setDraft}
-          onSend={() => send(draft)}
-          mode={prefs.mode}
-          onModeChange={(mode) => setPrefs((p) => ({ ...p, mode }))}
-          disabled={isThinking}
-        />
+        {onThread ? (
+          <>
+            <div className="thread-scroll">
+              <Thread messages={messages} isThinking={isThinking} endRef={endRef} />
+            </div>
+            <div className="docked-composer">{composer('docked')}</div>
+          </>
+        ) : (
+          <div className="home">
+            <div className="home-brand">
+              <FlameMark size={42} />
+              <span className="home-word">theospark</span>
+            </div>
+            <p className="home-tag">
+              Theology, answered from a {prefs.denomination} perspective
+            </p>
+            {composer('hero')}
+            <div className="chips">
+              {SUGGESTIONS.map(({ icon: ChipIcon, label, prompt }) => (
+                <button key={label} className="chip" onClick={() => send(prompt)}>
+                  <ChipIcon size={15} />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {toast && <div className="toast">{toast}</div>}
       </main>

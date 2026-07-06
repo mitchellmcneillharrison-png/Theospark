@@ -1,6 +1,6 @@
 import Logo from './Logo.jsx'
 import {
-  PenIcon,
+  PlusIcon,
   HistoryIcon,
   FolderIcon,
   UserIcon,
@@ -19,54 +19,52 @@ export default function Sidebar({
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <Logo />
+        <Logo size={26} />
       </div>
 
       <button className="new-chat-btn" onClick={onNewChat}>
-        <PenIcon size={17} />
-        New chat
+        <PlusIcon size={16} />
+        New Thread
       </button>
 
       <nav className="sidebar-nav">
-        <div className="nav-section">
-          <div className="nav-heading">
-            <HistoryIcon size={17} />
-            History
-          </div>
-          <ul className="history-list">
-            {conversations.length === 0 && (
-              <li className="history-empty">No conversations yet</li>
-            )}
-            {conversations.map((c) => (
-              <li key={c.id}>
-                <button
-                  className={`history-item${c.id === activeId ? ' active' : ''}`}
-                  onClick={() => onSelectConversation(c.id)}
-                  title={c.title}
-                >
-                  {c.title}
-                </button>
-              </li>
-            ))}
-          </ul>
+        <div className="nav-item" aria-hidden="true">
+          <HistoryIcon size={17} />
+          History
         </div>
-      </nav>
-
-      <div className="sidebar-footer">
+        <ul className="history-list">
+          {conversations.length === 0 && (
+            <li className="history-empty">No threads yet</li>
+          )}
+          {conversations.map((c) => (
+            <li key={c.id}>
+              <button
+                className={`history-item${c.id === activeId ? ' active' : ''}`}
+                onClick={() => onSelectConversation(c.id)}
+                title={c.title}
+              >
+                {c.title}
+              </button>
+            </li>
+          ))}
+        </ul>
         <button className="nav-item" onClick={() => onPlaceholder('Projects')}>
-          <FolderIcon size={18} />
+          <FolderIcon size={17} />
           Projects
         </button>
         <button className="nav-item" onClick={() => onPlaceholder('Profile')}>
-          <UserIcon size={18} />
+          <UserIcon size={17} />
           Profile
         </button>
+      </nav>
+
+      <div className="sidebar-footer">
         <button className="nav-item" onClick={onOpenSettings}>
-          <GearIcon size={18} />
+          <GearIcon size={17} />
           Settings
         </button>
         <button className="nav-item" onClick={() => onPlaceholder('More')}>
-          <MoreIcon size={18} />
+          <MoreIcon size={17} />
           More
         </button>
       </div>
